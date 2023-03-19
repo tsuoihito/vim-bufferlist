@@ -39,6 +39,10 @@ if !exists('g:BufferListMaxWidth')
   let g:BufferListMaxWidth = 40
 endif
 
+if !exists('g:BufferListMaxHeight')
+  let g:BufferListMaxHeight = 10
+endif
+
 " toggled the buffer list on/off
 function! BufferList()
   " if we get called and the list is open --> close it
@@ -55,12 +59,9 @@ function! BufferList()
   let l:bufnumbers = ''
   let l:width = g:BufferListWidth
 
-  " iterate through the buffers
-  let l:i = 0 | while l:i <= l:bufcount | let l:i = l:i + 1
-    let l:bufname = bufname(l:i)
-    if strlen(l:bufname)
-      \&& getbufvar(l:i, '&modifiable')
-      \&& getbufvar(l:i, '&buflisted')
+  for l:buf in getbufinfo({'buflisted': 1})->sort({ f, s -> s.lastused - f.lastused })
+    let l:bufname = bufname(l:buf.bufnr)
+    if strlen(l:bufname) && getbufvar(l:buf.bufnr, '&modifiable')
 
       " adapt width and/or buffer name
       if l:width < (strlen(l:bufname) + 5)
@@ -72,18 +73,18 @@ function! BufferList()
         endif
       endif
 
-      if bufwinnr(l:i) != -1
+      if bufwinnr(l:buf.bufnr) != -1
         let l:bufname = l:bufname . '*'
       endif
-      if getbufvar(l:i, '&modified')
+      if getbufvar(l:buf.bufnr, '&modified')
         let l:bufname = l:bufname . '+'
       endif
       " count displayed buffers
       let l:displayedbufs = l:displayedbufs + 1
       " remember buffer numbers
-      let l:bufnumbers = l:bufnumbers . l:i . ':'
+      let l:bufnumbers = l:bufnumbers . l:buf.bufnr . ':'
       " remember the buffer that was active BEFORE showing the list
-      if l:activebuf == l:i
+      if l:activebuf == l:buf.bufnr
         let l:activebufline = l:displayedbufs
       endif
       " fill the name with spaces --> gives a nice selection bar
@@ -94,7 +95,7 @@ function! BufferList()
       " add the name to the list
       let l:buflist = l:buflist . '  ' .l:bufname . "\n"
     endif
-  endwhile
+  endfor
 
   " Generate a variable full of non-breaking spaces
   " to fill the buffer afterwards" (we need this for "full window" color :)
@@ -103,8 +104,10 @@ function! BufferList()
     let l:fill = ' ' . l:fill
   endwhile
 
+  let l:height = l:displayedbufs > g:BufferListMaxHeight ? g:BufferListMaxHeight : l:displayedbufs
+
   " now, create the buffer & set it up
-  exec 'silent! ' . l:width . 'vne __BUFFERLIST__'
+  exec 'silent! ' . l:height . 'new __BUFFERLIST__'
   setlocal noshowcmd
   setlocal noswapfile
   setlocal buftype=nofile
@@ -120,8 +123,8 @@ function! BufferList()
     syn clear
     syn match BufferNormal /  .*/
     syn match BufferSelected /> .*/hs=s+1
-    hi def BufferNormal ctermfg=black ctermbg=white
-    hi def BufferSelected ctermfg=white ctermbg=black
+    hi def link BufferNormal Normal
+    hi def link BufferSelected CursorLine
   endif
 
   " Disable highlighting spaces at the end of the line, if
